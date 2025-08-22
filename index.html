@@ -51,6 +51,11 @@
 
         .content {
             padding: 2rem;
+
+
+            overflow-x: auto;
+            /* ✅ Scroll horizontal si es necesario */
+
         }
 
         .section-header {
@@ -145,6 +150,14 @@
         .form-group {
             display: flex;
             flex-direction: column;
+
+
+            min-width: 0;
+            /* ✅ Permite que flex shrink funcione */
+            width: 100%;
+            /* ✅ Ocupa todo el espacio asignado */
+            max-width: 100%;
+            /* ✅ No se sale del contenedor */
         }
 
         .form-group label {
@@ -162,6 +175,14 @@
             font-size: 1rem;
             transition: all 0.3s ease;
             background-color: white;
+
+
+            width: 100%;
+            /* ✅ Ocupa todo el ancho del form-group */
+            min-width: 0;
+            /* ✅ Permite shrinking */
+            box-sizing: border-box;
+            /* ✅ Incluye padding/border */
         }
 
         .form-group select:focus,
@@ -178,11 +199,20 @@
             cursor: not-allowed;
         }
 
+        /*grid-template-columns: repeat(4, 1fr);*/
         .dynamic-fields {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            /*grid-template-columns: repeat(4, 1fr);*/
+
+
             gap: 1.25rem;
             margin-bottom: 2rem;
+
+            width: 100%;
+            /* ✅ Importante */
+            overflow: visible;
+            /* ✅ No cortar contenido */
         }
 
         .dynamic-fields .form-group label {
@@ -589,6 +619,7 @@
             },
 
 
+            //testt
             "Instrumento de corto plazo": {
                 plazoDias: {
                     fechaInicio: "Fecha de emisión",
@@ -598,7 +629,7 @@
                     fechaInicio: "Fecha de emisión",
                     fechaFin: "Fecha de redención"
                 }
-            }
+            }//fin test
 
 
 
@@ -610,6 +641,35 @@
                 },
 
 
+            }
+            ,
+            "Instrumento estructurado": {
+                plazoDias: {
+                    fechaInicio: "Fecha de inicio",
+                    fechaFin: "Fecha de vencimiento"
+                }
+                ,
+                plazoVencimiento: {//supongo poor formula de plazodias...
+                    fechaInicio: "Fecha de inicio",
+                    fechaFin: "Fecha de vencimiento"
+                }
+            }
+
+            ,
+
+            "Bonos de Arrendamiento Financiero": {
+                plazoAños: {
+                    fechaInicio: "Fecha Liquidación",
+                    fechaFin: "Fecha de vencimiento"
+                }
+
+            },
+
+            "Inmobiliarias": {
+                plazoVencimiento: {
+                    fechaInicio: "Fecha de emisión",
+                    fechaFin: "Fecha de vencimiento"
+                }
             }
         };
 
@@ -903,7 +963,44 @@
         }
 
 
+        function calculatePlazoAniosDeposito() {
+            const tipoInstrumento = document.getElementById('tipoInstrumento').value;
+            const mapping = fieldMappingsUnificado[tipoInstrumento]?.plazoAños;
 
+            if (!mapping) {
+                console.log(`No hay mapeo de plazoDias definido para: ${tipoInstrumento}`);
+                return;
+            }
+
+            console.log(`Usando mapping plazoDias para ${tipoInstrumento}:`, mapping);
+
+            const fechaInicio = getFieldValue(mapping.fechaInicio);
+            const fechaFin = getFieldValue(mapping.fechaFin);
+            const plazoField = getFieldByCalculationId("plazo_anios");
+
+            // alert('mapping', plazoField)
+            if (fechaInicio && fechaFin && plazoField) {
+                const fecha1 = new Date(fechaInicio);
+                const fecha2 = new Date(fechaFin);
+                const diffTime = fecha2 - fecha1;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                // Validación para fechas negativas
+                if (diffDays < 0) {
+                    mostrarErrorFecha(plazoField.input, `La ${mapping.fechaFin} debe ser posterior a ${mapping.fechaInicio}`);
+                    setCalculatedValue(plazoField.input, plazoField.config, 0);
+                    return;
+                }
+
+                const diffYears = diffDays / 360;
+
+                limpiarErrorFecha(plazoField.input);
+                setCalculatedValue(plazoField.input, plazoField.config, diffYears);
+
+                // Recalcular interés
+                setTimeout(() => calculateInteresDeposito(), 50);
+            }
+        }
         /**
          * Calcula el plazo de vencimiento (Corto/Largo) basado en días
          */
@@ -1001,7 +1098,7 @@
                 return;
             }
 
-            console.log(`Usando mapping plazoVencimiento para ${tipoInstrumento}:`, mapping);
+            // console.log(`Usando mapping plazoVencimiento para ${tipoInstrumento}:`, mapping);
 
             const fechaInicio = getFieldValue(mapping.fechaInicio);
             const fechaFin = getFieldValue(mapping.fechaFin);
@@ -1078,10 +1175,23 @@
             const plazoField = getFieldByCalculationId("plazo_dias_deposito");
             const plazoEnDias = plazoField ? getCalculatedValue(plazoField.input, plazoField.config) : null;
 
-            const monto = getFieldValue("Monto");
+            /*const monto = getFieldValue("Monto");
+            if (monto === null) {
+                const montoField = getFieldByCalculationId("monto_interes");
+                console.log('montofield', montoField)
+                if (montoField) monto = getCalculatedValue(montoField.input, montoField.config);
+            }*/
+            //nilton cambiare lo de arriba poniendole el calcllationid directamente al campo para evitar que lea MONTO al inicio y sea otro el que represente este campo
+            const montoField = getFieldByCalculationId("monto_interes");
+            if (montoField) monto = getCalculatedValue(montoField.input, montoField.config);
+
+            // console.log('montofield', montoField)
             const interesField = getFieldByCalculationId("interes_deposito_simple");
 
 
+            // console.log('monto', monto)
+            // console.log('tasa', tasa)
+            // console.log('plazoendias', plazoEnDias)
 
             if (tasa !== null && plazoEnDias !== null && monto !== null && interesField) {
                 const tasaDecimal = tasa / 100;
@@ -1289,6 +1399,8 @@
             // Obtener mappings para el tipo actual
             const mappingPlazoDias = fieldMappingsUnificado[tipoInstrumento]?.plazoDias;
             const mappingPlazoVencimiento = fieldMappingsUnificado[tipoInstrumento]?.plazoVencimiento;
+            const mappingPlazoAnios = fieldMappingsUnificado[tipoInstrumento]?.plazoAños;
+
 
 
 
@@ -1310,6 +1422,13 @@
                     fieldConfig.label === mappingPlazoDias.fechaFin
                 )) {
                     input.addEventListener('change', calculatePlazoDiasDeposito);
+                }
+
+                if (mappingPlazoAnios && (
+                    fieldConfig.label === mappingPlazoAnios.fechaInicio ||
+                    fieldConfig.label === mappingPlazoAnios.fechaFin
+                )) {
+                    input.addEventListener('change', calculatePlazoAniosDeposito);
                 }
 
                 // Listeners para plazo de vencimiento
@@ -1338,7 +1457,16 @@
                     fieldConfig.label === "Tasa de depósito (%)" ||  // ← Agregar esta línea
                     fieldConfig.label === "Plazo en días" ||
                     fieldConfig.label === "Plazo (días)" ||          // ← Agregar esta línea
-                    fieldConfig.label === "Monto") {
+                    fieldConfig.label === "Monto" ||
+
+                    fieldConfig.label === "Subyacente de referencia (%)" ||
+                    fieldConfig.label === "Rendimiento Mínimo (%)"
+
+
+
+
+                ) {
+
                     input.addEventListener('change', calculateInteresDeposito);
                     input.addEventListener('input', calculateInteresDeposito);
                 }
@@ -1426,16 +1554,58 @@
         // ===================================================
 
         // Configuración de documentos por área
-        const documentRequirements = {
+        const documentRequirements2 = {
             "general": [
                 "Informe de Riesgos",
                 "Informe Legal",
                 "Acta de Comité de Inversiones"
             ],
-            "tesoreria": [
-                "Cierre de Cotización",
-                "Resultados de Subasta Adjudicada DPZ"
-            ],
+            "tesoreria": {
+                // Cada tipo de instrumento tiene sus propios documentos
+                "Depósitos BCRP": [
+                    "Cierre de Cotización BCRP",
+                    "resultados de Subasta Adjudicada DPZ"
+                ],
+                "Certificado del BCRP": [
+                    "Subasta publicada por el BCRP",
+                    "Resultados de Subasta Adjudicada CD´s BCRP"
+                ],
+                "Depósito a plazo": [
+                    "Cierre de Cotización BCRP",
+                    "resultados de Subasta Adjudicada DPZ"
+                ],
+                "Instrumento sintético": [
+                    "Cierre de Cotización con Entidad Financiera"
+                ],
+                "Instrumento estructurado": [
+                    "Cierre de Cotización con Entidad Financiera"
+                ],
+                "Cuenta remunerada": [
+                    "Correo con cierre de remuneración pactada con Entidad Financiera",
+                    "Carta de confirmación emitida por la Entidad Financiera"
+
+
+                ],
+
+
+
+
+
+
+                "Papel comercial": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+                "Pagarés": [
+                    //VACIO
+                ],
+                "Operación de reporte": [//VACIO
+                ],
+
+
+                //nuevo repetriod depósitos bcrp
+
+
+                "Instrumento de corto plazo": ["Publicación de oferta Pública, Póliza y/o confirmación de compra"],
+
+            },
             "riesgo": [
                 "Análisis de Riesgo Crediticio",
                 "Matriz de Riesgos",
@@ -1446,6 +1616,102 @@
                 "Contratos y Anexos",
                 "Dictamen Jurídico"
             ]
+        };
+
+
+        const documentRequirements = {
+            "general": [
+                "Informe de Riesgos",
+                "Informe Legal",
+                "Acta de Comité de Inversiones"
+            ],
+            "tesoreria": {
+                // ===== INSTRUMENTOS ÚNICOS (solo nombre) =====
+                "Depósitos BCRP": [
+                    "Cierre de Cotización BCRP",
+                    "resultados de Subasta Adjudicada DPZ"
+                ],
+
+                "Certificado del BCRP": [
+                    "Subasta publicada por el BCRP",
+                    "Resultados de Subasta Adjudicada CD´s BCRP"
+                ],
+                "Depósito a plazo": ["Cierre de Cotización BCRP",
+                    "resultados de Subasta Adjudicada DPZ"],
+
+                "Instrumento sintético": ["Cierre de Cotización con Entidad Financiera"],//repitetido igual
+                "Instrumento estructurado": ["Cierre de Cotización con Entidad Financiera"],//repeito igual
+                "Cuenta remunerada": ["Correo con cierre de remuneración pactada con Entidad Financiera",
+                    "Carta de confirmación emitida por la Entidad Financiera"],//repetido =
+
+                "Papel comercial": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"]
+
+
+                , "Instrumento de corto plazo": ["Publicación de oferta Pública", "Póliza", "confirmación de compra"],
+
+
+                "Bono Soberano": ["Confirmación de compra", "Constancia de Confirmación de Venta de Entidad Financiera"],
+                "Bono Global": ["Confirmación de compra", "Constancia de Confirmación de Venta de Entidad Financiera"],
+                "Bono con Garantía de Gobierno": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+
+                "Bono titulizado Gobierno": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+                "Bono Corporativo": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+
+                "Bono Subordinado": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+                "Bono Hipotecario": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+                "Otros Sistema Financiero": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+                "Bonos de Arrendamiento Financiero": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+                "Bono en Fideicomiso": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+                "Bono Titulizados": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+                "Instrumento de mediano plazo y largo plazo": ["Publicación de oferta Pública", "Póliza", "Confirmación de compra"],
+
+                "Mandato": ["Acta de comité de Inversiones", "Memorando dirigido a OAD."],
+
+                "Instrumentos Organismos Supranacionales": ["Acta de comité de Inversiones", "Memorando dirigido a OAD."],
+                "Inversiones en Notas y depósitos estructurados": ["Acta de comité de Inversiones", "Memorando dirigido a OAD"],
+                "Fondo mutuo": ["Acta de comité de Inversiones", "Memorando dirigido a OAD."],
+
+                "ETF": ["Acta de comité de Inversiones", "Memorando dirigido a OAD."],
+
+
+                "Inmobiliarias": [],
+
+                "Fondo alternativo privado": ["Acta de comité de Inversiones", "Carta de adjudicación de cuotas y/o monto comprometido", "Memorando dirigido a OAD"],
+                "Fondo alternativo público": ["Acta de comité de Inversiones", "Carta de adjudicación de cuotas y/o monto comprometido", "Memorando dirigido a OAD."],
+
+
+
+
+
+
+
+
+                // ===== INSTRUMENTOS REPETIDOS (ruta completa) =====
+
+                // Depósito a plazo LOCAL vs EXTRANJERO
+                "Renta Fija|Local|Fondos de Renta Fija|Fondo privado": [
+                    "Acta de comité de Inversiones", "Memorando dirigido a OAD"
+                ],
+                "Renta Fija|Extranjero|Fondos de Renta Fija|Fondo privado": [
+                    "Acta de comité de Inversiones", "Carta de adjudicación de cuotas y/o monto comprometido", "Memorando dirigido a OAD",
+                ],
+
+
+
+                "Renta Fija|Extranjero|Fondos de Renta Fija|ETF": [
+                    "Acta de comité de Inversiones", "Carta de adjudicación de cuotas y/o monto comprometido", "Memorando dirigido a OAD"
+                ],
+                "Renta Variable|Extranjero|Inversión Directa en instrumentos de capital|ETF": [
+                    "Acta de comité de Inversiones", "Memorando dirigido a OAD."
+                ],
+
+
+
+
+
+
+                // ... y así para todos los repetidos
+            }
         };
 
         let currentArea = 'general';
@@ -1651,11 +1917,16 @@
                                 "label": "Entidad Financiera Adjudicada",
                                 "type": "select",
                                 "options": [
-                                    "BANCO CENTRAL DE RESERVA DEL PERÚ"
+                                    "BANCO CENTRAL DE RESERVA DEL PERU"
                                 ]
                             },
                             {
                                 "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
                                 "type": "select",
                                 "options": []
                             },
@@ -1685,7 +1956,9 @@
                                 "type": "number",
                                 "attributes": {
                                     "step": "0.01"
-                                }
+                                },
+                                "calculationId": "monto_interes"
+
                             },
                             {
                                 "label": "Plazo en días",
@@ -1774,8 +2047,18 @@
                                 "label": "Emisor",
                                 "type": "select",
                                 "options": [
-                                    "BANCO CENTRAL DE RESERVA DEL PERÚ"
+                                    "BANCO CENTRAL DE RESERVA DEL PERU"
                                 ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Clasificación de riesgos",
@@ -1945,7 +2228,35 @@
                                 "label": "Entidad Financiera Adjudicada",
                                 "type": "select",
                                 "options": [
-                                    "BANCO CENTRAL DE RESERVA DEL PERÚ"
+                                    "BANCO AZTECA DEL PERU S.A.",
+                                    "BANCO BBVA PERÚ",
+                                    "BANCO DE COMERCIO",
+                                    "BANCO DE CREDITO DEL PERU",
+                                    "BANCO DE LA NACION",
+                                    "BANCO FALABELLA PERU S.A",
+                                    "BANCO GNB PERU S.A.",
+                                    "BANCO INTERAMERICANO DE FINANZAS",
+                                    "BANCO INTERBANK",
+                                    "BANCO PICHINCHA",
+                                    "BANCO RIPLEY PERU S.A.",
+                                    "BANCO SANTANDER GLOBAL CORPORATE BANKING",
+                                    "BANCO SANTANDER PERU S.A.",
+                                    "BANCO SCOTIABANK",
+                                    "BBVA NEW YORK",
+                                    "BNP PARIBAS",
+                                    "CITIBANK DEL PERU S.A.",
+                                    "COMPARTAMOS FINANCIERA",
+                                    "CREDIT SUISSE AG",
+                                    "DEUTSCHE BANK",
+                                    "FALABELLA PERU S.A.A",
+                                    "FINANCIERA CONFIANZA S.A.A.",
+                                    "FINANCIERA CREDISCOTIA",
+                                    "FINANCIERA EDYFICAR",
+                                    "FINANCIERA EFECTIVA S.A.",
+                                    "FINANCIERA TFC",
+                                    "ICBC PERU BANK",
+                                    "MIBANCO"
+
                                 ]
                             },
                             {
@@ -1979,7 +2290,9 @@
                                 "type": "number",
                                 "attributes": {
                                     "step": "0.01"
-                                }
+                                },
+                                "calculationId": "monto_interes"
+
                             },
                             {
                                 "label": "Plazo en días",
@@ -2104,10 +2417,11 @@
                                 "label": "Entidad Financiera Spot/Forward",//pendiente compromiso
                                 "type": "select",
                                 "options": [
-                                    // "INTERBANK",
-                                    // "SCOTIABANK PERU",
-                                    // "BCP",
-                                    // "BBVA"
+                                    "BANCO BBVA PERÚ",
+                                    "BANCO DE CREDITO DEL PERU",
+                                    "BANCO INTERBANK",
+                                    "BANCO SANTANDER PERU S.A.",
+                                    "BANCO SCOTIABANK"
                                 ]
                             },
 
@@ -2167,6 +2481,12 @@
                                 "label": "Entidad Financiera DPZ",//pendiente lista creo
                                 "type": "select",
                                 "options": [
+                                    "BANCO BBVA PERÚ",
+                                    "BANCO DE CREDITO DEL PERU",
+                                    "BANCO INTERBANK",
+                                    "BANCO SANTANDER PERU S.A.",
+                                    "BANCO SCOTIABANK"
+
 
                                 ]
                             }, {
@@ -2176,6 +2496,7 @@
                                     "step": "0.01"
                                 },
                                 "autoFilled": true // 🆕 AGREGAR ESTO
+
 
                             },
                             // {
@@ -2257,7 +2578,173 @@
                                 "calculationId": "tasa_tea_sintetico"
                             },
                         ],
-                        "Instrumento estructurado": [],
+                        "Instrumento estructurado": [//niltoncito
+                            {
+                                "label": "Código del instrumento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se generará automáticamente"
+                                },
+                                "autogenerated": true
+                            },
+                            {
+                                "label": "Unidad de negocio",
+                                "type": "select",
+                                "options": [],
+                                "special": "business_unit"
+                            },
+
+                            {
+                                "label": "Plazo de vencimiento",
+                                // "type": "select",
+                                // "options": [
+                                //     "Cortop",
+                                //     "Largo"
+                                // ]
+
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true
+                            },
+
+
+                            {
+                                "label": "Entidad Financiera Adjudicada",
+                                "type": "select",
+                                "options": [
+                                    "BANCO BBVA PERÚ",
+                                    "BANCO DE CREDITO DEL PERU",
+                                    "BANCO INTERBANK",
+                                    "BANCO SANTANDER PERU S.A.",
+                                    "BANCO SCOTIABANK"
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
+                            },
+
+                            {
+                                "label": "Monto",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.01"
+                                }
+                            },
+                            {
+                                "label": "Fecha de operación",
+                                "type": "date"
+                            },
+                            {
+                                "label": "Moneda",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Tipo de tasa",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Rendimiento Mínimo (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                },
+                                "calculationId": "tasa_deposito" // ← Agregar esto
+
+                            }, {
+                                "label": "Rendimiento Máximo (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                }
+                            },
+                            {
+                                "label": "Rebate al Alza (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                }
+                            }, {
+                                "label": "Rebate a la Baja (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                }
+                            },
+
+
+                            {
+                                "label": "Subyacente de referencia (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                },
+                                "calculationId": "monto_interes"
+                            },
+
+
+                            {
+                                "label": "Nombre de índice de referencia",
+                                "type": "text",
+                                "attributes": {
+                                },
+                            },
+                            {
+                                "label": "Fecha de inicio",
+                                "type": "date"
+                            }, {
+                                "label": "Fecha de vencimiento",
+                                "type": "date"
+                            },
+
+                            {
+                                "label": "Plazo (días)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "1",
+                                    "readonly": true
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_dias_deposito"
+                            },
+                            {
+                                "label": "Interés al vencimiento",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.01"
+                                },
+                                "calculated": true,
+                                "calculationId": "interes_deposito_simple"
+                            },
+
+
+                            {
+                                "label": "Banco cuenta de cargo",
+                                "type": "select",
+                                "options": [],
+                                "special": "bank_account"
+                            },
+                            {
+                                "label": "N° de Cuenta Bancaria",
+                                "type": "select",
+                                "options": [],
+                                "special": "account_number"
+                            }
+
+
+                        ],
                         "Cuenta remunerada": [
                             {
                                 "label": "Código del instrumento",
@@ -2294,11 +2781,11 @@
                                 "label": "Entidad Financiera Adjudicada",
                                 "type": "select",
                                 "options": [
-                                    "BANCO DE CRÉDITO",
-                                    "BANCO SCOTIABANK",
-                                    "BANCO BBCA PERÚ",
-                                    "BANCO INTERBANK",
-                                    "BANCO DE LA NACIÓN"
+                                    "BANCO BBVA PERÚ",
+                                    "BANCO DE CREDITO DEL PERU",
+                                    "BANCO DE LA NACION",
+                                    " BANCO INTERBANK",
+                                    "BANCO SCOTIABANK"
 
                                 ]
                             },
@@ -2410,16 +2897,65 @@
                                 },
                                 "calculated": true
                             },
+                            /*
                             {
                                 "label": "Emisor",
                                 "type": "text"
+                            },//ha sido reemplazad con lista de entidad financiera*/
+                            {
+                                "label": "Emisor",
+                                "type": "select",
+                                "options": [
+                                    "ALICORP S.A.A",
+                                    "VOLCAN COMPAÑIA MINERA S.A.A.",
+                                    "BANCO AGRARIO - AGROBANCO", "COFIDE"
+
+
+                                ]
                             },
+                            {
+                                "label": "Agente Colocador",
+                                "type": "select",
+                                "options": [
+                                    "ANDES SECURITIES SAB",
+                                    "ARGENTA S.A.B.",
+                                    "BBVA BOLSA SAB",
+                                    "BTG PACTUAL ",
+                                    "CAVALI ICLV S.A.",
+                                    "CITICORP PERÚ S.A. SAB",
+                                    "CREDICORP CAPITAL SAB S.A.",
+                                    "DIVISO BOLSA SAB S.A.",
+                                    "INTELIGO S.A.B",
+                                    "INTERFIP BOLSA S.A.",
+                                    "INVESTA S.A. S.A.B.",
+                                    "KALLPA SECURITIES SAB",
+                                    "PERUVAL S.A. S.A.B.",
+                                    "PRISMA S.A.B.",
+                                    "PUENTE HNOS S.A.B. S.A.",
+                                    "RENTA4 S.A.B",
+                                    "S.A.B. MACROVALORES SUDAMERICANO S.A.B.         ",
+                                    "SANTANDER S.A.B.",
+                                    "SCOTIABOLSA  SAB S.A",
+                                    "SEMINARIO S.A.B.",
+                                    "SUDAMERIS PERU S.A.B.     ",
+                                    "WIESE SUDAMERIS S.A.B.     "
+
+
+
+                                ]
+                            },
+
+
+
                             {
                                 "label": "Clasificación de riesgos",
                                 "type": "select",
-                                "options": [
-
-                                ]
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Denominación",
@@ -2558,16 +3094,38 @@
                                 },
                                 "calculated": true
                             },
+                            // {
+                            //     "label": "Emisor",
+                            //     "type": "text"
+                            // },
+
+
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select",
+                                "options": [
+                                    "PLUZ ENERGIA PERU S.A.A.",
+                                    "SAGA FALABELLA,  S.A",
+                                    "TELEFONICA DEL PERU SAA",
+                                    "TOTTUS"
+
+
+                                ]
                             },
+
+
+
+
+
                             {
                                 "label": "Clasificación de riesgos",
                                 "type": "select",
-                                "options": [
-
-                                ]
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Denominación",
@@ -2673,7 +3231,125 @@
                                 "special": "custody_name"
                             }
                         ],
-                        "Pagarés": [],
+                        "Pagarés": [
+
+                            {
+                                "label": "Código del instrumento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se generará automáticamente"
+                                },
+                                "autogenerated": true
+                            },
+                            {
+                                "label": "Unidad de negocio",
+                                "type": "select",
+                                "options": [],
+                                "special": "business_unit"
+                            },
+
+                            {
+                                "label": "Plazo de vencimiento",
+                                // "type": "select",
+                                // "options": [
+                                //     "Cortop",
+                                //     "Largo"
+                                // ]
+
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true
+                            },
+
+
+                            {
+                                "label": "Entidad Financiera Adjudicada",
+                                "type": "select",
+                                "options": [
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
+                            },
+
+
+
+
+
+                            {
+                                "label": "Librador/Emisor",
+
+                                "type": "text",
+
+                            },
+                            {
+                                "label": "Benficiario/Tenedor",
+
+                                "type": "text",
+
+                            },
+
+                            {
+                                "label": "Avalista",
+
+                                "type": "text",
+
+                            },
+
+                            {
+                                "label": "Tipo de Pagare",
+                                "type": "select",
+                                "options": ["A la orden", "No a la orden", "Bancario", "No Bancario"
+                                ]
+                            }, {
+                                "label": "Moneda",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Monto",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.01"
+                                }
+                            }
+
+                            , {
+                                "label": "Fecha de emisión",
+                                "type": "date"
+                            }
+                            , {
+                                "label": "Fecha de vencimiento",
+                                "type": "date"
+                            },
+
+
+                            {
+                                "label": "Banco cuenta de cargo",
+                                "type": "select",
+                                "options": [],
+                                "special": "bank_account"
+                            },
+                            {
+                                "label": "N° de Cuenta Bancaria",
+                                "type": "select",
+                                "options": [],
+                                "special": "account_number"
+                            }
+
+
+                        ],
                         "Operación de reporte": [
                             {
                                 "label": "Código del instrumento",
@@ -2714,9 +3390,12 @@
                             {
                                 "label": "Clasificación de riesgos",
                                 "type": "select",
-                                "options": [
-
-                                ]
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Prestamista",
@@ -2729,10 +3408,7 @@
                                 "label": "Prestatario",
                                 "type": "select",
                                 "options": [
-                                    "INTERBANK",
-                                    "SCOTIABANK PERU",
-                                    "BCP",
-                                    "BBVA"
+
                                 ]
                             },
                             {
@@ -2843,11 +3519,20 @@
                                 "label": "Entidad Financiera Adjudicada",
                                 "type": "select",
                                 "options": [
-                                    "BANCO CENTRAL DE RESERVA DEL PERÚ"
+                                    "BANCO CREDIT AGRICOLE INDOSUEZ SWITZERLAND SA", "BANCO SANTANDER GLOBAL CORPORATE BANKING", "BBVA NEW YORK", "CREDIT SUISSE AG", "FONDO LATINOAMERICANO DE RESERVAS",
+                                    "SUMITOMO MITSUI TRUST BANK",
+                                    "THE BANK OF NOVA SCOTIA TORONTO",
+                                    "UBS SWITZERLAND AG"
+
                                 ]
                             },
                             {
                                 "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
                                 "type": "select",
                                 "options": []
                             },
@@ -3001,6 +3686,10 @@
                                 "label": "Entidad Financiera Spot/Forward",//pendiente compromiso
                                 "type": "select",
                                 "options": [
+                                    "BANCO SANTANDER GLOBAL CORPORATE BANKING",
+                                    "BBVA NEW YORK",
+                                    "THE BANK OF NOVA SCOTIA TORONTO"
+
                                     // "INTERBANK",
                                     // "SCOTIABANK PERU",
                                     // "BCP",
@@ -3155,7 +3844,177 @@
                             },
 
                         ],
-                        "Instrumento estructurado": [],
+
+
+                        "Instrumento estructurado": [//niltoncito 2
+                            {
+                                "label": "Código del instrumento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se generará automáticamente"
+                                },
+                                "autogenerated": true
+                            },
+                            {
+                                "label": "Unidad de negocio",
+                                "type": "select",
+                                "options": [],
+                                "special": "business_unit"
+                            },
+
+                            {
+                                "label": "Plazo de vencimiento",
+                                // "type": "select",
+                                // "options": [
+                                //     "Cortop",
+                                //     "Largo"
+                                // ]
+
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true
+                            },
+
+
+                            {
+                                "label": "Entidad Financiera Adjudicada",
+                                "type": "select",
+                                "options": [
+                                    "BANCO SANTANDER GLOBAL CORPORATE BANKING",
+                                    "BBVA NEW YORK",
+                                    "THE BANK OF NOVA SCOTIA TORONTO"
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
+                            },
+
+                            {
+                                "label": "Monto",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.01"
+                                }
+                            },
+                            {
+                                "label": "Fecha de operación",
+                                "type": "date"
+                            },
+                            {
+                                "label": "Moneda",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Tipo de tasa",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Rendimiento Mínimo (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                },
+                                "calculationId": "tasa_deposito" // ← Agregar esto
+
+                            }, {
+                                "label": "Rendimiento Máximo (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                }
+                            },
+                            {
+                                "label": "Rebate al Alza (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                }
+                            }, {
+                                "label": "Rebate a la Baja (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                }
+                            },
+
+
+                            {
+                                "label": "Subyacente de referencia (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                },
+                                "calculationId": "monto_interes"
+                            },
+
+
+                            {
+                                "label": "Nombre de índice de referencia",
+                                "type": "text",
+                                "attributes": {
+                                },
+                            },
+                            {
+                                "label": "Fecha de inicio",
+                                "type": "date"
+                            }, {
+                                "label": "Fecha de vencimiento",
+                                "type": "date"
+                            },
+
+                            {
+                                "label": "Plazo (días)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "1",
+                                    "readonly": true
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_dias_deposito"
+                            },
+                            {
+                                "label": "Interés al vencimiento",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.01"
+                                },
+                                "calculated": true,
+                                "calculationId": "interes_deposito_simple"
+                            },
+
+
+                            {
+                                "label": "Banco cuenta de cargo",
+                                "type": "select",
+                                "options": [],
+                                "special": "bank_account"
+                            },
+                            {
+                                "label": "N° de Cuenta Bancaria",
+                                "type": "select",
+                                "options": [],
+                                "special": "account_number"
+                            }
+
+
+                        ],
+
+
+
+
                         "Cuenta remunerada": [
                             {
                                 "label": "Código del instrumento",
@@ -3193,15 +4052,19 @@
                                 "type": "select",
                                 "options": [
                                     "BANCO CREDIT AGRICOLE",
-                                    "UBS SWITZERLAND AG",
+                                    "UBS SWITZERLAND AG"
+
                                 ]
                             },
                             {
                                 "label": "Clasificación de riesgos",
                                 "type": "select",
-                                "options": [
-
-                                ]
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Fecha Inicio de Remuneración",
@@ -3303,11 +4166,17 @@
                                 "label": "Entidad Financiera Adjudicada",
                                 "type": "select",
                                 "options": [
-                                    "BANCO CENTRAL DE RESERVA DEL PERÚ"
+                                    "BANCO CENTRAL DE RESERVA DEL PERU"
                                 ]
                             },
+
                             {
                                 "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
                                 "type": "select",
                                 "options": []
                             },
@@ -3427,14 +4296,20 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
-                            },
-                            {
-                                "label": "Clasificación de riesgos",
                                 "type": "select",
                                 "options": [
 
                                 ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Denominación",
@@ -3574,14 +4449,19 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select"
+                                ,
+                                "options": []
                             },
                             {
                                 "label": "Clasificación de riesgos",
                                 "type": "select",
-                                "options": [
-
-                                ]
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Denominación",
@@ -3716,25 +4596,34 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
+
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select",
+                                "options": [
+                                    "REPUBLICA DEL PERU"
+
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "ISIN",
@@ -3787,7 +4676,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Cupón (%)",
@@ -3910,14 +4800,7 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
-                            {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
+
                             {
                                 "label": "Plazo calificación",
                                 "type": "select",
@@ -3928,7 +4811,11 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select",
+                                "options": [
+                                    "REPUBLICA DEL PERU"
+
+                                ]
                             },
                             {
                                 "label": "ISIN",
@@ -3981,7 +4868,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Cupón (%)",
@@ -4104,25 +4992,33 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
+
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select",
+                                "options": [
+
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "ISIN",
@@ -4175,7 +5071,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Cupón (%)",
@@ -4298,25 +5195,34 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
+
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Emisor",
                                 "type": "text"
+
+                                , "options": [
+                                    "TABOADA FINANCE LTD"
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "ISIN",
@@ -4369,7 +5275,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Cupón (%)",
@@ -4477,7 +5384,7 @@
                         ]
                     },
                     "Bonos Sistema Financiero": {
-                        "Bono Corporativo": [
+                        "Bono Corporativo": [//holi
                             {
                                 "label": "Código del instrumento",
                                 "type": "text",
@@ -4494,21 +5401,16 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
+
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Tipo de oferta",
@@ -4520,8 +5422,58 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select"
+                                , "options": [
+                                    "BANCO BBVA PERÚ", "BANCO DE CREDITO DEL PERU", "BANCO PICHINCHA", "BANCO SCOTIABANK", "MIBANCO"
+
+
+
+
+
+                                ]
                             },
+                            {
+                                "label": "Agente Colocador",
+                                "type": "select",
+                                "options": [
+                                    "ANDES SECURITIES SAB",
+                                    "ARGENTA S.A.B.",
+                                    "BBVA BOLSA SAB",
+                                    "BTG PACTUAL ",
+                                    "CAVALI ICLV S.A.",
+                                    "CITICORP PERÚ S.A. SAB",
+                                    "CREDICORP CAPITAL SAB S.A.",
+                                    "DIVISO BOLSA SAB S.A.",
+                                    "INTELIGO S.A.B",
+                                    "INTERFIP BOLSA S.A.",
+                                    "INVESTA S.A. S.A.B.",
+                                    "KALLPA SECURITIES SAB",
+                                    "PERUVAL S.A. S.A.B.",
+                                    "PRISMA S.A.B.",
+                                    "PUENTE HNOS S.A.B. S.A.",
+                                    "RENTA4 S.A.B",
+                                    "S.A.B. MACROVALORES SUDAMERICANO S.A.B.         ",
+                                    "SANTANDER S.A.B.",
+                                    "SCOTIABOLSA  SAB S.A",
+                                    "SEMINARIO S.A.B.",
+                                    "SUDAMERIS PERU S.A.B.     ",
+                                    "WIESE SUDAMERIS S.A.B.     "
+
+
+
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
+                            },
+
                             {
                                 "label": "Denominación",
                                 "type": "text"
@@ -4584,7 +5536,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tasa cupón (%)",
@@ -4682,22 +5635,18 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
+
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
-                            },
+
                             {
                                 "label": "Tipo de oferta",
                                 "type": "select",
@@ -4708,7 +5657,58 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select",
+                                "options": [
+                                    "BANCO BBVA PERÚ",
+                                    "BANCO DE CREDITO DEL PERU",
+                                    "BANCO GNB PERU S.A", "BANCO INTERBANK"
+
+                                ]
+
+
+
+
+                            },
+                            {
+                                "label": "Agente Colocador",
+                                "type": "select",
+                                "options": [
+                                    "ANDES SECURITIES SAB",
+                                    "ARGENTA S.A.B.",
+                                    "BBVA BOLSA SAB",
+                                    "BTG PACTUAL ",
+                                    "CAVALI ICLV S.A.",
+                                    "CITICORP PERÚ S.A. SAB",
+                                    "CREDICORP CAPITAL SAB S.A.",
+                                    "DIVISO BOLSA SAB S.A.",
+                                    "INTELIGO S.A.B",
+                                    "INTERFIP BOLSA S.A.",
+                                    "INVESTA S.A. S.A.B.",
+                                    "KALLPA SECURITIES SAB",
+                                    "PERUVAL S.A. S.A.B.",
+                                    "PRISMA S.A.B.",
+                                    "PUENTE HNOS S.A.B. S.A.",
+                                    "RENTA4 S.A.B",
+                                    "S.A.B. MACROVALORES SUDAMERICANO S.A.B.         ",
+                                    "SANTANDER S.A.B.",
+                                    "SCOTIABOLSA  SAB S.A",
+                                    "SEMINARIO S.A.B.",
+                                    "SUDAMERIS PERU S.A.B.     ",
+                                    "WIESE SUDAMERIS S.A.B.     "
+
+
+
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Denominación",
@@ -4772,7 +5772,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tasa cupón (%)",
@@ -4870,21 +5871,16 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
+
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Tipo de oferta",
@@ -4896,7 +5892,53 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select",
+                                "options": [
+                                    "BANCO INTERAMERICANO DE FINANZAS",
+                                    "BANCO INTERBANK"
+
+                                ]
+                            },
+                            {
+                                "label": "Agente Colocador",
+                                "type": "select",
+                                "options": [
+                                    "ANDES SECURITIES SAB",
+                                    "ARGENTA S.A.B.",
+                                    "BBVA BOLSA SAB",
+                                    "BTG PACTUAL ",
+                                    "CAVALI ICLV S.A.",
+                                    "CITICORP PERÚ S.A. SAB",
+                                    "CREDICORP CAPITAL SAB S.A.",
+                                    "DIVISO BOLSA SAB S.A.",
+                                    "INTELIGO S.A.B",
+                                    "INTERFIP BOLSA S.A.",
+                                    "INVESTA S.A. S.A.B.",
+                                    "KALLPA SECURITIES SAB",
+                                    "PERUVAL S.A. S.A.B.",
+                                    "PRISMA S.A.B.",
+                                    "PUENTE HNOS S.A.B. S.A.",
+                                    "RENTA4 S.A.B",
+                                    "S.A.B. MACROVALORES SUDAMERICANO S.A.B.         ",
+                                    "SANTANDER S.A.B.",
+                                    "SCOTIABOLSA  SAB S.A",
+                                    "SEMINARIO S.A.B.",
+                                    "SUDAMERIS PERU S.A.B.     ",
+                                    "WIESE SUDAMERIS S.A.B.     "
+
+
+
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Denominación",
@@ -4960,7 +6002,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tasa cupón (%)",
@@ -5007,18 +6050,14 @@
                                 "label": "Banco cuenta de cargo",
                                 "type": "select",
                                 "options": [
-                                    "SCOTIABANK PERU",
-                                    "INTERBANK",
-                                    "BCP",
-                                    "BBVA"
+
                                 ]
                             },
                             {
                                 "label": "N° de Cuenta Bancaria",
                                 "type": "select",
                                 "options": [
-                                    "Ahorros MN 970-0700108",
-                                    "Ahorros ME-444-8798234"
+
                                 ]
                             },
                             {
@@ -5041,7 +6080,211 @@
                                 ]
                             }
                         ],
-                        "Bono Leasing": [],
+                        "Bonos de Arrendamiento Financiero": [//bye
+                            {
+                                "label": "Código del instrumento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se generará automáticamente"
+                                },
+                                "autogenerated": true
+                            },
+                            {
+                                "label": "Unidad de negocio",
+                                "type": "select",
+                                "options": [],
+                                "special": "business_unit"
+                            },
+
+                            {
+                                "label": "Plazo de vencimiento",
+
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true
+                            },
+
+                            {
+                                "label": "Tipo de oferta",
+                                "type": "select",
+                                "options": [
+                                    "Publica",
+                                    "Privada"
+                                ]
+                            },
+
+                            {
+                                "label": "Emisor",
+                                "type": "select",
+                                "options": [
+                                    "BANCO BBVA PERÚ",
+                                    "BANCO GNB PERU S.A.",
+                                    "BANCO INTERAMERICANO DE FINANZAS",
+                                    "BANCO SANTANDER PERU S.A."
+
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
+                            },
+
+
+                            {
+                                "label": "Denominación",
+                                "type": "text"
+                            },
+                            {
+                                "label": "ISIN",
+                                "type": "text",
+                                "attributes": {
+                                    "placeholder": "Ej: US0378331005"
+                                }
+                            },
+                            {
+                                "label": "Nemónico",
+                                "type": "text"
+                            },
+                            {
+                                "label": "Moneda",
+                                "type": "select",
+                                "options": [
+                                    "PEN",
+                                    "USD",
+                                    "EUR",
+                                    "JPY"
+                                ]
+                            },
+
+                            {
+                                "label": "Cantidad adquirida",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.01"
+                                }
+                            },
+                            {
+                                "label": "Valor nominal unitario",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.01"
+                                }
+                            },
+
+                            {
+                                "label": "Valor nominal adquirido",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.01"
+                                }
+                            },
+                            {
+                                "label": "Monto total de emisión",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.01"
+                                }
+                            },
+
+                            {
+                                "label": "Precio de compra (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                }
+                            },
+                            {
+                                "label": "Periodicidad del cupón",
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
+                            },
+                            {
+                                "label": "Tasa cupón (%)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                }
+                            },
+                            {
+                                "label": "Tipo amortización",
+                                "type": "text"
+                            },
+                            {
+                                "label": "Fecha de colocación",
+                                "type": "date"
+                            },
+                            {
+                                "label": "Fecha de compra",
+                                "type": "date"
+                            },
+                            {
+                                "label": "Fecha Liquidación",
+                                "type": "date"
+                            },
+                            {
+                                "label": "Fecha de vencimiento",
+                                "type": "date"
+                            },
+
+
+                            {
+                                "label": "Plazo en años",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "1",
+                                    "readonly": true
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_anios"
+                            },
+                            {
+                                "label": "Tasa de rendimiento (TIR)",
+                                "type": "number",
+                                "attributes": {
+                                    "step": "0.0001"
+                                }
+                            },
+
+                            {
+                                "label": "Banco cuenta de cargo",
+                                "type": "select",
+                                "options": [],
+                                "special": "bank_account"
+                            },
+                            {
+                                "label": "N° de Cuenta Bancaria",
+                                "type": "select",
+                                "options": [],
+                                "special": "account_number"
+                            },
+                            {
+                                "label": "Tipo de custodia",
+                                "type": "select",
+                                "options": [
+                                    "Local",
+                                    "Internacional"
+                                ],
+                                "special": "custody_type"
+                            },
+                            {
+                                "label": "Nombre de custodia",
+                                "type": "select",
+                                "options": [],
+                                "special": "custody_name"
+                            }
+
+
+                        ],
                         "Otros Sistema Financiero": [
                             {
                                 "label": "Código del instrumento",
@@ -5060,20 +6303,14 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Tipo de oferta",
@@ -5085,7 +6322,55 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select",
+                                "options": [
+                                    "COFIDE",
+                                    "CAF",
+
+                                    "FONDO MIVIVIENDA"
+
+                                ]
+                            },
+                            {
+                                "label": "Agente Colocador",
+                                "type": "select",
+                                "options": [
+                                    "ANDES SECURITIES SAB",
+                                    "ARGENTA S.A.B.",
+                                    "BBVA BOLSA SAB",
+                                    "BTG PACTUAL ",
+                                    "CAVALI ICLV S.A.",
+                                    "CITICORP PERÚ S.A. SAB",
+                                    "CREDICORP CAPITAL SAB S.A.",
+                                    "DIVISO BOLSA SAB S.A.",
+                                    "INTELIGO S.A.B",
+                                    "INTERFIP BOLSA S.A.",
+                                    "INVESTA S.A. S.A.B.",
+                                    "KALLPA SECURITIES SAB",
+                                    "PERUVAL S.A. S.A.B.",
+                                    "PRISMA S.A.B.",
+                                    "PUENTE HNOS S.A.B. S.A.",
+                                    "RENTA4 S.A.B",
+                                    "S.A.B. MACROVALORES SUDAMERICANO S.A.B.         ",
+                                    "SANTANDER S.A.B.",
+                                    "SCOTIABOLSA  SAB S.A",
+                                    "SEMINARIO S.A.B.",
+                                    "SUDAMERIS PERU S.A.B.     ",
+                                    "WIESE SUDAMERIS S.A.B.     "
+
+
+
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Denominación",
@@ -5149,7 +6434,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tasa cupón (%)",
@@ -5232,7 +6518,7 @@
                         ]
                     },
                     "Bonos Empresas no Financieras": {
-                        "Bono Corporativo": [
+                        "Bono Corporativo": [//bcc
                             {
                                 "label": "Código del instrumento",
                                 "type": "text",
@@ -5249,14 +6535,7 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
-                            {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
+
                             {
                                 "label": "Plazo calificación",
                                 "type": "select",
@@ -5275,8 +6554,81 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select"
+                                , "options": [
+                                    "ADMINISTRADORA JOCKEY PLAZA SHOPPING CENTER S.A",
+                                    "ALICORP S.A.A",
+                                    "BARRICK  MISCHICHILCA",
+                                    "CEMENTOS LIMA S.A.A.",
+                                    "CINEPLEX S.A.",
+                                    "CORPORACIÓN AZUCARERA DEL PERU S.A.- COAZUCAR",
+                                    "CORPORACION LINDLEY S.A.",
+                                    "DUKE ENERGY EGENOR",
+                                    "EDEGEL",
+                                    "ENEL DISTRIBUCION PERU S.A.A.",
+                                    "ENERGIA EÓLICA SA",
+                                    "ENGIE ENERGIA PERU S.A (ANTES ENERSUR S.A.)",
+                                    "FONDO MIVIVIENDA",
+                                    "GLORIA",
+                                    "GYM FERROVÍAS S.A.",
+                                    "HERMES TRASNPORTES BLINDADOS S.A.",
+                                    "INRETAIL SHOPPING MALLS",
+                                    "INTERCORP PERU LTD.",
+                                    "LAMSAC",
+                                    "LUZ DEL SUR S.A.A.",
+                                    "NORVIAL",
+                                    "OBRAS DE INGENIERIA S.A.",
+                                    "PALMAS DEL ESPINO S.A.",
+                                    "PERU LNG",
+                                    "PLANTA DE RESERVA FRIA DE GENERACION DE ETEN S.A.",
+                                    "PLUSPETROL CAMISEA",
+                                    "PLUZ ENERGIA PERU S.A.A.",
+                                    "PRIMAX S.A",
+                                    "REP",
+                                    "SAGA FALABELLA,  S.A",
+                                    "TELEFONICA DEL PERU SAA",
+                                    "TELEFONICA MOVILES S.A.",
+                                    "TGP",
+                                    "TRANSMANTARO",
+                                    "TRASVASE OLMOS",
+                                    "KALLPA GENERACION S.A",
+                                    "BNP PARIBAS",
+                                    "FALABELLA PERU S.A.A"
+
+                                ]
                             },
+                            {
+                                "label": "Agente Colocador",
+                                "type": "select",
+                                "options": [
+                                    "ANDES SECURITIES SAB",
+                                    "ARGENTA S.A.B.",
+                                    "BBVA BOLSA SAB",
+                                    "BTG PACTUAL ",
+                                    "CAVALI ICLV S.A.",
+                                    "CITICORP PERÚ S.A. SAB",
+                                    "CREDICORP CAPITAL SAB S.A.",
+                                    "DIVISO BOLSA SAB S.A.",
+                                    "INTELIGO S.A.B",
+                                    "INTERFIP BOLSA S.A.",
+                                    "INVESTA S.A. S.A.B.",
+                                    "KALLPA SECURITIES SAB",
+                                    "PERUVAL S.A. S.A.B.",
+                                    "PRISMA S.A.B.",
+                                    "PUENTE HNOS S.A.B. S.A.",
+                                    "RENTA4 S.A.B",
+                                    "S.A.B. MACROVALORES SUDAMERICANO S.A.B.",
+                                    "SANTANDER S.A.B.",
+                                    "SCOTIABOLSA  SAB S.A",
+                                    "SEMINARIO S.A.B.",
+                                    "SUDAMERIS PERU S.A.B.     ",
+                                    "WIESE SUDAMERIS S.A.B.     "
+
+
+
+                                ]
+                            },
+
                             {
                                 "label": "Denominación",
                                 "type": "text"
@@ -5339,7 +6691,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tasa cupón (%)",
@@ -5439,14 +6792,7 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
-                            {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
+
                             {
                                 "label": "Plazo calificación",
                                 "type": "select",
@@ -5457,7 +6803,10 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select",
+                                "options": [
+                                    //vacio segun excel
+                                ]
                             },
                             {
                                 "label": "Denominación",
@@ -5533,7 +6882,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tipo de interés",
@@ -5648,25 +6998,74 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select",
+                                "options": [
+                                    "E. WONG & ",
+                                    "HOCP",
+                                    "INTERNACIONAL DE TITULOS SOCIEDAD TITULIZADORA SA",
+                                    "MORGAN STANLEY",
+                                    "RED DORSAL FINANCE LIMITED",
+                                    "BANCO BBVA PERÚ",
+                                    "BANCO DE CREDITO DEL PERU",
+                                    "BANCO SCOTIABANK"
+                                ]
                             },
+
+
+                            {
+                                "label": "Agente Colocador",
+                                "type": "select",
+                                "options": [
+                                    "ANDES SECURITIES SAB",
+                                    "ARGENTA S.A.B.",
+                                    "BBVA BOLSA SAB",
+                                    "BTG PACTUAL ",
+                                    "CAVALI ICLV S.A.",
+                                    "CITICORP PERÚ S.A. SAB",
+                                    "CREDICORP CAPITAL SAB S.A.",
+                                    "DIVISO BOLSA SAB S.A.",
+                                    "INTELIGO S.A.B",
+                                    "INTERFIP BOLSA S.A.",
+                                    "INVESTA S.A. S.A.B.",
+                                    "KALLPA SECURITIES SAB",
+                                    "PERUVAL S.A. S.A.B.",
+                                    "PRISMA S.A.B.",
+                                    "PUENTE HNOS S.A.B. S.A.",
+                                    "RENTA4 S.A.B",
+                                    "S.A.B. MACROVALORES SUDAMERICANO S.A.B.         ",
+                                    "SANTANDER S.A.B.",
+                                    "SCOTIABOLSA  SAB S.A",
+                                    "SEMINARIO S.A.B.",
+                                    "SUDAMERIS PERU S.A.B.     ",
+                                    "WIESE SUDAMERIS S.A.B.     "
+
+
+
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
+                            },
+
+
                             {
                                 "label": "Denominación",
                                 "type": "text"
@@ -5741,7 +7140,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tipo de interés",
@@ -5858,20 +7258,14 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Tipo de oferta",
@@ -5883,7 +7277,20 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select"
+                                , "options": [
+                                    //sin data
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Denominación",
@@ -5947,7 +7354,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tasa cupón (%)",
@@ -6030,7 +7438,7 @@
                         ]
                     },
                     "Fondos de Renta Fija": {
-                        "Fondo privado de renta fija tradicional": [
+                        "Fondo privado": [
                             {
                                 "label": "Código del instrumento",
                                 "type": "text",
@@ -6048,28 +7456,36 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Nombre del fondo",
-                                "type": "text"
+                                "type": "text",
+                                // "options":[
+                                //     // "MACROCAPITALES SAFI SA"//por definiri
+
+                                // ]
                             },
                             {
                                 "label": "Nombre de la SAFI o General Partner",
                                 "type": "text"
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Moneda",
@@ -6216,20 +7632,14 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Nombre del Mandato",
@@ -6242,6 +7652,16 @@
                             {
                                 "label": "Gestor del mandato",
                                 "type": "text"
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Moneda",
@@ -6343,20 +7763,14 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Tipo de oferta",
@@ -6368,7 +7782,20 @@
                             },
                             {
                                 "label": "Emisor",
-                                "type": "text"
+                                "type": "select",
+                                "options": [
+                                    //sin data
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Denominación",
@@ -6432,7 +7859,8 @@
                             },
                             {
                                 "label": "Periodicidad del cupón",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "periodicidad_cupon" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tasa cupón (%)",
@@ -6534,20 +7962,14 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Nombre del fondo",
@@ -6560,6 +7982,16 @@
                             {
                                 "label": "Gestor del fondo",
                                 "type": "text"
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "ISIN",
@@ -6682,14 +8114,7 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
-                            {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
+
                             {
                                 "label": "Plazo calificación",
                                 "type": "select",
@@ -6832,20 +8257,14 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Nombre del fondo",
@@ -6854,6 +8273,16 @@
                             {
                                 "label": "Nombre de la SAFI o General Partner",
                                 "type": "text"
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Moneda",
@@ -7004,32 +8433,42 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
-                            },
-                            {
-                                "label": "Nombre del Mandato",
-                                "type": "text"
+                                "label": "Nombre del Mandato",//uuuuuuuuuuuuu
+                                "type": "select"
+                                , "options": [],
+                                "fieldId": "nombre_mandato" // 🆕 Agregar esto
+
                             },
                             {
                                 "label": "Tipo de estrategia de inversión",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "tipo_estrategia" // 🆕 Agregar esto
+
                             },
                             {
                                 "label": "Gestor del mandato",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "gestor_mandato" // 🆕 Agregar esto
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Moneda",
@@ -7132,32 +8571,42 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
-                            },
-                            {
-                                "label": "Nombre del fondo",
-                                "type": "text"
+                                "label": "Nombre del fondo",//uuuuuuuuuuuuu
+                                "type": "select"
+                                , "options": [],
+                                "fieldId": "nombre_fondo" // 🆕 Agregar esto
+
                             },
                             {
                                 "label": "Tipo de estrategia de inversión",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "tipo_estrategia" // 🆕 Agregar esto
+
                             },
                             {
                                 "label": "Gestor del fondo",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "gestor_fondo" // 🆕 Agregar esto
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "ISIN",
@@ -7287,32 +8736,41 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
-                            },
-                            {
-                                "label": "Nombre del Mandato",
-                                "type": "text"
+                                "label": "Nombre del Mandato",//uuuuuuuuuuuuu
+                                "type": "select"
+                                , "options": [],
+                                "fieldId": "nombre_mandato" // 🆕 Agregar esto
+
                             },
                             {
                                 "label": "Tipo de estrategia de inversión",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "tipo_estrategia" // 🆕 Agregar esto
+
                             },
                             {
                                 "label": "Gestor del mandato",
-                                "type": "text"
+                                "type": "select", "options": [],
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Moneda",
@@ -7415,32 +8873,39 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Nombre del fondo",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "nombre_fondo" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tipo de estrategia de inversión",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "tipo_estrategia" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Gestor del fondo",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "gestor_fondo" // 🆕 Agregar esto
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "ISIN",
@@ -7566,32 +9031,39 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Nombre del fondo",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "nombre_fondo" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Tipo de estrategia de inversión",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "tipo_estrategia" // 🆕 Agregar esto
                             },
                             {
                                 "label": "Gestor del fondo",
-                                "type": "text"
+                                "type": "select", "options": [],
+                                "fieldId": "gestor_fondo" // 🆕 Agregar esto
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "ISIN",
@@ -7705,7 +9177,75 @@
             "Inversiones Alternativas": {
                 "Local": {
                     "Inversiones inmobiliarias": {
-                        "Inmobiliarias": []
+                        "Inmobiliarias": [
+
+                            {
+                                "label": "Código del instrumento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se generará automáticamente"
+                                },
+                                "autogenerated": true
+                            },
+                            {
+                                "label": "Unidad de negocio",
+                                "type": "select",
+                                "options": [],
+                                "special": "business_unit"
+                            },
+                            {
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
+                            },
+                            {
+                                "label": "Entidad Financiera Adjudicada",
+                                "type": "select",
+                                "options": [
+                                    "BANCO CENTRAL DE RESERVA DEL PERU"
+                                ]
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
+                            },
+
+
+                            {
+                                "label": "Moneda",
+                                "type": "select",
+                                "options": []
+                            },
+
+                            {
+                                "label": "Fecha de emisión",
+                                "type": "date"
+                            },
+
+                            {
+                                "label": "Fecha de vencimiento",
+                                "type": "date"
+                            },
+
+
+
+
+
+
+                        ]
+
                     },
                     "Fondos de inversión": {
                         "Fondo alternativo privado": [
@@ -7726,20 +9266,14 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Nombre del fondo",
@@ -7748,6 +9282,16 @@
                             {
                                 "label": "Nombre de la SAFI o General Partner",
                                 "type": "text"
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Moneda",
@@ -7768,6 +9312,10 @@
                             },
                             {
                                 "label": "Fecha de suscripición del contrato",
+                                "type": "date"
+                            },
+                            {
+                                "label": "Fecha de vencimiento",
                                 "type": "date"
                             },
                             {
@@ -7868,20 +9416,14 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Nombre del fondo",
@@ -7890,6 +9432,16 @@
                             {
                                 "label": "Nombre de la SAFI o General Partner",
                                 "type": "text"
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "Moneda",
@@ -7910,6 +9462,10 @@
                             },
                             {
                                 "label": "Fecha de suscripición del contrato",
+                                "type": "date"
+                            },
+                            {
+                                "label": "Fecha de vencimiento",
                                 "type": "date"
                             },
                             {
@@ -8008,20 +9564,14 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Nombre del fondo",
@@ -8042,6 +9592,16 @@
                                 ]
                             },
                             {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
                                 "label": "Capital comprometido",
                                 "type": "number",
                                 "attributes": {
@@ -8050,6 +9610,10 @@
                             },
                             {
                                 "label": "Fecha de suscripición del contrato",
+                                "type": "date"
+                            },
+                            {
+                                "label": "Fecha de vencimiento",
                                 "type": "date"
                             },
                             {
@@ -8148,20 +9712,14 @@
                                 ]
                             },
                             {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
-                            {
-                                "label": "Plazo calificación",
-                                "type": "select",
-                                "options": [
-                                    "Corto",
-                                    "Largo"
-                                ]
+                                "label": "Plazo de vencimiento",
+                                "type": "text",
+                                "attributes": {
+                                    "readonly": true,
+                                    "placeholder": "Se calculará automáticamente"
+                                },
+                                "calculated": true,
+                                "calculationId": "plazo_vencimiento"
                             },
                             {
                                 "label": "Nombre del fondo",
@@ -8174,6 +9732,16 @@
                             {
                                 "label": "Gestor del fondo",
                                 "type": "text"
+                            },
+                            {
+                                "label": "Clasificación de riesgos",
+                                "type": "select",
+                                "options": []
+                            },
+                            {
+                                "label": "Grupo económico",
+                                "type": "select",
+                                "options": []
                             },
                             {
                                 "label": "ISIN",
@@ -8215,6 +9783,10 @@
                             },
                             {
                                 "label": "Fecha de negociación",
+                                "type": "date"
+                            },
+                            {
+                                "label": "Fecha de vencimiento",
                                 "type": "date"
                             },
                             {
@@ -8299,14 +9871,7 @@
                                     "MACROFONDO", "NO MACROFONDO"
                                 ]
                             },
-                            {
-                                "label": "Tipo de operación",
-                                "type": "select",
-                                "options": [
-                                    "Compra",
-                                    "Venta"
-                                ]
-                            },
+
                             {
                                 "label": "Plazo calificación",
                                 "type": "select",
@@ -8342,6 +9907,10 @@
                             },
                             {
                                 "label": "Fecha de suscripición del contrato",
+                                "type": "date"
+                            },
+                            {
+                                "label": "Fecha de vencimiento",
                                 "type": "date"
                             },
                             {
@@ -8440,7 +10009,321 @@
         const centralizedOptions = {
             "Clasificación de riesgos": riskClassificationOptions,
             "Moneda": ["PEN", "USD", "EUR"],
-            "Tipo de tasa": ["TEA", "TNA", "VAC", "Variable"]
+            "Tipo de tasa": ["TEA", "TNA", "VAC", "Variable"],
+
+            "Grupo económico": [
+                "Grupo Breca",
+                "Grupo Romero",
+                "Grupo Scotiabank",
+                "Grupo Intercorp",
+                "Grupo Falabella",
+                "Grupo Gloria",
+                "Grupo Carlyle",
+                "Grupo Wellington",
+                "Grupo Blackrock"
+            ],
+
+            // 🆕 Nuevas opciones por ID específico
+            "nombre_mandato": [
+                "ACWI",
+                "MILA Plus",
+                "Renta Fija Defensiva",
+                "Core Plus"
+
+            ],
+
+            "gestor_mandato": [
+                //falta especificar!!
+            ],
+
+
+            "tipo_estrategia": [
+                "Aggressive Allocation",
+                "USD Fixed Income",
+                "Hedge Fund",
+                "Greater China Equity",
+                "Commodities Agriculture",
+                "Commodities Broad Basket",
+                "Commodities Energy",
+                "Commodities Industrial Metals",
+                "Commodities Miscellaneous",
+                "Commodities Precious Metals",
+                "Communications Sector Equity",
+                "Conservative Allocation",
+                "Consumer Goods & Services Sector Equity",
+                "Convertibles",
+                "Fixed Income",
+                "Emerging Markets Equity",
+                "Asia Inc Japan Equity",
+                "Emerging Markets Fixed Income",
+                "Energy Sector Equity",
+                "Precious Metals Sector Equity",
+                "Europe Equity Large Cap",
+                "Financials Sector Equity",
+                "Global Equity Large Cap",
+                "Global Equity Mid/Small Cap",
+                "Real Estate Sector Equity",
+                "Healthcare Sector Equity",
+                "High Yield Fixed Income",
+                "USD Municipal Fixed Income",
+                "India Equity",
+                "Industrials Sector Equity",
+                "Japan Equity",
+                "US Equity Large Cap",
+                "Latin America Equity",
+                "Long/Short Equity",
+                "Market Neutral",
+                "US Equity Mid/Small Cap",
+                "Other Equity",
+                "Other Sector Equity",
+                "Moderate Allocation",
+                "Multialternative",
+                "Currency",
+                "Other Alternative",
+
+            ],
+
+            "gestor_fondo": [
+                "BlackRock",
+                "Vanguard",
+                "State Street Global Advisors (SSGA)",
+                "Fidelity Investments",
+                "J.P. Morgan Asset Management",
+                "Capital Group",
+                "PIMCO",
+                "BNY Mellon Investment Management",
+                "Charles Schwab Investment Management",
+                "Dimensional Fund Advisors (DFA)",
+                "Invesco",
+                "Franklin Templeton",
+                "T. Rowe Price",
+                "Northern Trust Asset Management",
+                "Goldman Sachs Asset Management (GSAM)",
+                "Morgan Stanley Investment Management (MSIM)",
+                "PGIM (Prudential)",
+                "AllianceBernstein (AB)",
+                "American Century Investments",
+                "Putnam Investments",
+                "Janus Henderson Investors",
+                "Neuberger Berman",
+                "MFS Investment Management",
+                "Dodge & Cox",
+                "Lord Abbett",
+                "DoubleLine Capital",
+                "AQR Capital Management",
+                "Principal Global Investors",
+                "SEI Investments",
+                "Guggenheim Investments",
+                "Hartford Funds",
+                "Nationwide Funds",
+                "First Trust",
+                "WisdomTree",
+                "VanEck",
+                "ProShares/ProFunds",
+                "Global X (Mirae Asset)",
+                "ARK Invest",
+                "Pacer ETFs",
+                "KraneShares",
+                "RBC Global Asset Management",
+                "TD Asset Management",
+                "BMO Global Asset Management",
+                "CI Global Asset Management",
+                "Mackenzie Investments",
+                "Manulife Investment Management",
+                "CIBC Asset Management",
+                "Scotia Global Asset Management (1832 AM)",
+                "National Bank Investments (NBI)",
+                "AGF Investments",
+                "Amundi",
+                "DWS Group",
+                "UBS Asset Management",
+                "Legal & General Investment Management (LGIM)",
+                "Schroders",
+                "abrdn",
+                "AXA Investment Managers",
+                "BNP Paribas Asset Management",
+                "Natixis Investment Managers",
+                "Pictet Asset Management",
+                "Carmignac",
+                "Robeco",
+                "Candriam",
+                "Eurizon Capital",
+                "Generali Investments",
+                "Anima SGR",
+                "Allianz Global Investors / AllianzIM",
+                "Union Investment",
+                "Deka Investment",
+                "MEAG (Munich Re/ERGO)",
+                "Flossbach von Storch",
+                "Vontobel Asset Management",
+                "Swisscanto (ZKB)",
+                "J. Safra Sarasin / Sarasin & Partners",
+                "Royal London Asset Management",
+                "Baillie Gifford",
+                "Jupiter Asset Management",
+                "Liontrust Asset Management",
+                "Artemis Investment Management (UK)",
+                "Rathbones Unit Trust Management",
+                "Columbia Threadneedle Investments",
+                "Nordea Asset Management",
+                "SEB Investment Management",
+                "Swedbank Robur",
+                "Handelsbanken Fonder",
+                "Danske Invest",
+                "Storebrand Asset Management",
+                "DNB Asset Management",
+                "Nomura Asset Management",
+                "Nikko Asset Management",
+                "Daiwa Asset Management",
+                "Asset Management One",
+                "Sumitomo Mitsui DS Asset Management",
+                "Mitsubishi UFJ Kokusai AM",
+                "Nissay Asset Management",
+                "Mirae Asset Global Investments",
+                "Samsung Asset Management",
+                "KB Asset Management",
+                "China Asset Management (ChinaAMC)",
+                "E Fund Management",
+
+            ],
+            "nombre_fondo": [
+                "Vanguard S&P 500 ETF",
+                "iShares Core S&P 500 ETF",
+                "SPDR S&P 500 ETF Trust",
+                "Vanguard Total Stock Market ETF",
+                "Invesco QQQ Trust",
+                "Vanguard Growth ETF",
+                "Nomura NEXT FUNDS TOPIX ETF",
+                "Vanguard FTSE Developed Markets ETF",
+                "iShares Core MSCI EAFE ETF",
+                "Vanguard Value ETF",
+                "Vanguard Total Bond Market ETF",
+                "iShares Core U.S. Aggregate Bond ETF",
+                "iShares Core S&P 500 UCITS ETF",
+                "iShares Russell 1000 Growth ETF",
+                "iShares Core MSCI World UCITS ETF",
+                "SPDR Gold Trust",
+                "iShares Core MSCI Emerging Markets ETF",
+                "Vanguard Total International Stock ETF",
+                "Vanguard Information Technology ETF",
+                "iShares Core S&P Mid-Cap ETF",
+                "Vanguard FTSE Emerging Markets ETF",
+                "Vanguard Dividend Appreciation ETF",
+                "iShares Bitcoin Trust",
+                "Vanguard Mid-Cap ETF",
+                "SPDR Technology Select Sector ETF",
+                "Nikko TOPIX ETF",
+                "iShares Core S&P Small-Cap ETF",
+                "SPDR Portfolio S&P 500 ETF",
+                "Daiwa TOPIX iFreeETF",
+                "Nomura Nikkei 225 ETF",
+                "iShares Core S&P Total U.S. Stock Market ETF",
+                "Invesco S&P 500 Equal Weight ETF",
+                "Schwab U.S. Dividend Equity ETF",
+                "Vanguard Total International Bond ETF",
+                "iShares MSCI EAFE ETF",
+                "Vanguard Small-Cap ETF",
+                "Vanguard High Dividend Yield ETF",
+                "iShares S&P 500 Growth ETF",
+                "iShares Russell 2000 ETF",
+                "iShares Russell 1000 Value ETF",
+                "Invesco NASDAQ 100 ETF",
+                "Schwab U.S. Large-Cap ETF",
+                "Vanguard Intermediate-Term Corporate Bond ETF",
+                "iShares 0-3 Month Treasury Bond ETF",
+                "iShares MSCI USA Quality Factor ETF",
+                "Vanguard Total World Stock ETF",
+                "SPDR Select Sector Financial ETF",
+                "Schwab International Equity ETF",
+                "Vanguard FTSE All-World ex-US ETF",
+                "Vanguard S&P 500 UCITS ETF",
+                "iShares Gold Trust",
+                "iShares 20+ Year Treasury Bond ETF",
+                "iShares Core MSCI Total International Stock ETF",
+                "Schwab U.S. Large-Cap Growth ETF",
+                "Vanguard Large-Cap ETF",
+                "iShares Russell Mid-Cap ETF",
+                "SPDR Bloomberg 1-3 Month T-Bill ETF",
+                "iShares Russell 1000 ETF",
+                "iShares iBoxx $ High Yield Corporate Bond ETF",
+                "iShares iBoxx $ Investment Grade Corporate Bond ETF",
+                "iShares U.S. Treasury Bond ETF",
+                "iShares 7-10 Year Treasury Bond ETF",
+                "JPMorgan Ultra-Short Income ETF",
+                "iShares 1-3 Year Treasury Bond ETF",
+                "iShares MSCI USA Min Vol Factor ETF",
+                "Consumer Discretionary Select Sector SPDR Fund",
+                "Health Care Select Sector SPDR Fund",
+                "Communication Services Select Sector SPDR Fund",
+                "Industrial Select Sector SPDR Fund",
+                "Energy Select Sector SPDR Fund",
+                "Materials Select Sector SPDR Fund",
+                "Utilities Select Sector SPDR Fund",
+                "KraneShares CSI China Internet ETF",
+                "ARK Innovation ETF",
+                "VanEck Semiconductor ETF",
+                "iShares Semiconductor ETF",
+                "SPDR S&P Biotech ETF",
+                "iShares Russell 3000 ETF",
+                "Vanguard Small-Cap Value ETF",
+                "Vanguard Small-Cap Growth ETF",
+                "Schwab U.S. Large-Cap Value ETF",
+                "iShares Russell Mid-Cap Value ETF",
+                "iShares Russell Mid-Cap Growth ETF",
+                "iShares Russell 2000 Value ETF",
+                "iShares Russell 2000 Growth ETF",
+                "iShares MSCI Emerging Markets ETF",
+                "iShares MSCI Japan ETF",
+                "iShares MSCI Eurozone ETF",
+                "iShares MSCI Brazil ",
+                "iShares China Large-Cap ETF",
+                "SPDR Portfolio S&P 500 Growth ETF",
+                "Invesco S&P 500 Low Volatility ETF",
+                "SPDR Portfolio S&P 500 High Dividend ETF",
+                "Vanguard S&P 500 UCITS ETF (EUR)",
+                "iShares MSCI EAFE UCITS ETF",
+                "iShares J.P. Morgan USD Emerging Markets Bond ETF",
+                "iShares TIPS Bond ETF",
+                "Vanguard Intermediate-Term Bond ETF",
+                "Vanguard Short-Term Bond ETF",
+                "iShares Short Treasury Bond ETF",
+                "NB LAOF Asset Allocation LP ",
+                "Vintage VI Mgr LP ",
+                "AlpInvest FCR Secondaries Fund LP ",
+                "Altamar Global Private Equity VIII FCR",
+                "Pantheon Multistrategy Program 2014 (US) ",
+                "AlpInvest FCR II Secondaries Fund LP",
+                "Blackstone Property Parners F2 LP",
+                "Harbourvest 2019 Global Feeder Fund LP",
+                "Harbourvest 2020 Global Feeder Fund LP",
+                "Fondo Mutuo PIMCO ",
+                "Fondo Mutuo Wellington ",
+                "Fondo Mutuo JP Morgan ",
+                "Fondo Mutuo Fidelity Asia",
+                "Fondo Mutuo Schroders",
+                "Fondo Mutuo Jupiter ",
+                "Fondo Mutuo Fidelity Europa",
+                "Fondo Mutuo Tokio Marine",
+                "Monroe Capital Private Credit Fund (6)",
+                "Blackrock Direct Lending Feeder IX L LP (6)",
+                "Fondo Mutuo Credit Suisse Nova Global Senior Loan ",
+                "Fondo Mutuo Credit Suisse Supply Chain Finance",
+                "Fondo Mutuo Barings Global Loan Fund",
+                "Fondo Mutuo Nordea ",
+                "Fondo Mutuo Vontobel",
+                "Fondo Mutuo Pimco GIS",
+                "Fondo Mutuo JPM EMBI",
+                "Fondo Mutuo Blackrock EMBI"
+
+            ],
+
+
+
+            "periodicidad_cupon": [
+                "Mensual", "Trimestral", "Semestral", "Anual", "Bimestral", "cuatrimestral"
+
+
+            ]
         };
 
         let filesUploaded = {
@@ -8578,7 +10461,7 @@
         }
 
         // Función para actualizar tipo de instrumento
-        function updateTipoInstrumento() {
+        function updateTipoInstrumento2() {
             const successMessage = document.getElementById('successMessage');
             successMessage.classList.add('hidden');
             successMessage.textContent = '';
@@ -8613,6 +10496,61 @@
                 });
             } else {
                 tipoInstrumentoSelect.disabled = true;
+            }
+
+            checkFormCompletion();
+        }
+
+
+        function updateTipoInstrumento() {
+            const successMessage = document.getElementById('successMessage');
+            successMessage.classList.add('hidden');
+            successMessage.textContent = '';
+
+            const claseActivo = document.getElementById('claseActivo').value;
+            const mercado = document.getElementById('mercado').value;
+            const subcategoria = document.getElementById('subcategoria').value;
+            const tipoInstrumentoSelect = document.getElementById('tipoInstrumento');
+            const dynamicFields = document.getElementById('dynamicFields');
+
+            // Limpiar campos dinÃ¡micos
+            tipoInstrumentoSelect.innerHTML = '<option value="">Seleccione tipo de instrumento</option>';
+            dynamicFields.innerHTML = '';
+
+            // Reset variables
+            currentBusinessUnit = '';
+            currentBankAccount = '';
+
+            if (claseActivo && mercado && subcategoria &&
+                investmentData[claseActivo] &&
+                investmentData[claseActivo][mercado] &&
+                investmentData[claseActivo][mercado][subcategoria]) {
+
+                tipoInstrumentoSelect.disabled = false;
+                const tiposInstrumento = Object.keys(investmentData[claseActivo][mercado][subcategoria]);
+
+                tiposInstrumento.forEach(tipo => {
+                    const option = document.createElement('option');
+                    option.value = tipo;
+                    option.textContent = tipo;
+                    tipoInstrumentoSelect.appendChild(option);
+                });
+
+                // 🎯 RESTAURAR EL LISTENER ORIGINAL + DOCUMENTOS
+                tipoInstrumentoSelect.onchange = function () {
+                    showFields(); // ✅ Llamada original del HTML
+                    // 🎯 REGENERAR DOCUMENTOS DE TESORERÍA SI ESTÁ ACTIVA
+                    if (currentArea === 'tesoreria') {
+                        setTimeout(() => generateDocumentFields(), 100); // Con delay para que termine showFields()
+                    }
+                };
+            } else {
+                tipoInstrumentoSelect.disabled = true;
+            }
+
+            // 🎯 REGENERAR DOCUMENTOS DE TESORERÍA SI ESTÁ ACTIVA
+            if (currentArea === 'tesoreria') {
+                generateDocumentFields();
             }
 
             checkFormCompletion();
@@ -8665,7 +10603,7 @@
                         input = document.createElement('select');
                         input.innerHTML = '<option value="">Seleccione</option>';
 
-                        if (fieldConfig.options && fieldConfig.options.length > 0) {
+                        /*if (fieldConfig.options && fieldConfig.options.length > 0) {
                             fieldConfig.options.forEach(option => {
                                 const optionElement = document.createElement('option');
                                 optionElement.value = option;
@@ -8674,6 +10612,40 @@
                             });
                         } else if (fieldConfig.options && fieldConfig.options.length === 0) {
                             // Buscar opciones centralizadas
+                            for (const [key, options] of Object.entries(centralizedOptions)) {
+                                if (fieldConfig.label === key) {
+                                    options.forEach(option => {
+                                        const optionElement = document.createElement('option');
+                                        optionElement.value = option;
+                                        optionElement.textContent = option;
+                                        input.appendChild(optionElement);
+                                    });
+                                    break;
+                                }
+                            }
+                        }*/
+
+
+                        // 🆕 PRIORIDAD 1: Buscar por fieldId específico
+                        if (fieldConfig.fieldId && centralizedOptions[fieldConfig.fieldId]) {
+                            centralizedOptions[fieldConfig.fieldId].forEach(option => {
+                                const optionElement = document.createElement('option');
+                                optionElement.value = option;
+                                optionElement.textContent = option;
+                                input.appendChild(optionElement);
+                            });
+                        }
+                        // 🔹 PRIORIDAD 2: Si tiene opciones definidas en el campo
+                        else if (fieldConfig.options && fieldConfig.options.length > 0) {
+                            fieldConfig.options.forEach(option => {
+                                const optionElement = document.createElement('option');
+                                optionElement.value = option;
+                                optionElement.textContent = option;
+                                input.appendChild(optionElement);
+                            });
+                        }
+                        // 🔹 PRIORIDAD 3: Buscar por label (sistema actual)
+                        else {
                             for (const [key, options] of Object.entries(centralizedOptions)) {
                                 if (fieldConfig.label === key) {
                                     options.forEach(option => {
@@ -8695,7 +10667,10 @@
                             custodyNameElement.disabled = true;
                         }
 
-                    } else {
+                    }
+
+
+                    else {
                         input = document.createElement('input');
                         const isNumeric = fieldConfig.type === 'number';
                         input.type = isNumeric ? 'text' : fieldConfig.type;
@@ -8832,13 +10807,26 @@
                     handleCustodyDependency(custodyTypeElement, custodyNameElement);
                 }
 
+                // console.log('Campos creados:', dynamicFields.querySelectorAll('input, select').length);
+                // console.log('Campos esperados:', fields.length);
                 // Configurar campos especiales
-                updateSpecialFields();
+                // updateSpecialFields();
+                setTimeout(() => {
+                    updateSpecialFields();
+                }, 500); // Aumentar de 100 a 500
+
 
                 // ✅ CONFIGURAR TODOS LOS LISTENERS DE CÁLCULO
                 setupCalculationListeners();
             }
 
+
+
+
+            // 🎯 REGENERAR DOCUMENTOS SI TESORERÍA ESTÁ ACTIVA
+            if (currentArea === 'tesoreria') {
+                generateDocumentFields();
+            }
             checkFormCompletion();
         }
 
@@ -9465,7 +11453,11 @@
                     };
                 }
 
-
+                // console.log('Campo:', fieldConfig.label, 'Special:', fieldConfig.special);
+                // console.log('Input existe:', !!input);
+                if (fieldConfig.special === 'business_unit') {
+                    // console.log('Configurando business_unit para mercado:', currentMarket);
+                }
                 if (fieldConfig.special === 'business_unit') {
                     const businessUnits = getBusinessUnits(currentMarket);
                     input.innerHTML = '<option value="">Seleccione</option>';
@@ -9576,15 +11568,99 @@
             });
             event.target.classList.add('active');
 
+            // 🎯 VERIFICAR SI ES TESORERÍA Y HAY TIPO SELECCIONADO
+            if (area === 'tesoreria') {
+                const tipoInstrumento = document.getElementById('tipoInstrumento').value;
+                if (!tipoInstrumento) {
+                    const container = document.getElementById('documentFields');
+                    container.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #666; border: 1px dashed #ccc; border-radius: 6px;">
+                    <h4 style="color: #005C97;">⚠️ Selección Requerida</h4>
+                    <p>Para mostrar los documentos de tesorería, primero debe:</p>
+                    <ol style="text-align: left; display: inline-block;">
+                        <li>Completar la selección en la Sección 1</li>
+                        <li>Seleccionar un tipo de instrumento</li>
+                    </ol>
+                    <p><small>Los documentos varían según cada tipo de instrumento</small></p>
+                </div>
+            `;
+                    return;
+                }
+            }
+
             generateDocumentFields();
         }
+
+
+        function generateDocumentFields2() {
+            const container = document.getElementById('documentFields');
+            container.innerHTML = '';
+            filesUploaded = {};
+
+            let documents = [];
+
+            if (currentArea === 'general') {
+                documents = documentRequirements[currentArea] || [];
+            } else if (currentArea === 'tesoreria') {
+                // 🎯 OBTENER EL TIPO DE INSTRUMENTO SELECCIONADO
+                const tipoInstrumento = document.getElementById('tipoInstrumento').value;
+
+                if (tipoInstrumento && documentRequirements[currentArea][tipoInstrumento]) {
+                    documents = documentRequirements[currentArea][tipoInstrumento];
+                } else {
+                    // Si no hay tipo seleccionado, mostrar mensaje
+                    container.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #666;">
+                    <p>📋 Primero seleccione un tipo de instrumento en la Sección 1</p>
+                    <p>Los documentos de tesorería se mostrarán según el instrumento seleccionado</p>
+                </div>
+            `;
+                    return;
+                }
+            }
+
+            // Generar campos como antes
+            documents.forEach((docName, index) => {
+                createDocumentField(docName, `${currentArea}_${index}`);
+            });
+        }
+
 
         function generateDocumentFields() {
             const container = document.getElementById('documentFields');
             container.innerHTML = '';
             filesUploaded = {};
 
-            const documents = documentRequirements[currentArea] || [];
+            let documents = [];
+
+            if (currentArea === 'general') {
+                documents = documentRequirements[currentArea] || [];
+            } else if (currentArea === 'tesoreria') {
+                const claseActivo = document.getElementById('claseActivo').value;
+                const mercado = document.getElementById('mercado').value;
+                const subcategoria = document.getElementById('subcategoria').value;
+                const tipoInstrumento = document.getElementById('tipoInstrumento').value;
+
+                // 🎯 ESTRATEGIA 1: Buscar por ruta completa (para repetidos)
+                const formularioKey = `${claseActivo}|${mercado}|${subcategoria}|${tipoInstrumento}`;
+
+                if (documentRequirements[currentArea][formularioKey]) {
+                    documents = documentRequirements[currentArea][formularioKey];
+                }
+                // 🎯 ESTRATEGIA 2: Si no encuentra, buscar solo por nombre (para únicos)
+                else if (documentRequirements[currentArea][tipoInstrumento]) {
+                    documents = documentRequirements[currentArea][tipoInstrumento];
+                }
+                // 🎯 ESTRATEGIA 3: Si nada, mostrar mensaje
+                else {
+                    container.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #666;">
+                    <p>📋 Complete la selección del formulario en la Sección 1</p>
+                </div>
+            `;
+                    return;
+                }
+            }
 
             documents.forEach((docName, index) => {
                 createDocumentField(docName, `${currentArea}_${index}`);
